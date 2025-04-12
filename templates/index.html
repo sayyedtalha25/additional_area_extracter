@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CSV to Excel Converter</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+        .container {
+            margin-bottom: 20px;
+        }
+        #download-button {
+            display: none;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        #download-button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Additonal Area Extracter App</h1>
+
+    <div class="container">
+        <label for="csv-file">Upload CSV File:</label>
+        <input type="file" id="csv-file" name="file" accept=".csv">
+    </div>
+
+    <div class="container">
+        <button id="process-button" disabled>Process</button>
+        <p id="processing-message" style="display: none;">Processing...</p>
+        <a id="download-button" href="#">Download Excel</a>
+        <p id="error-message" style="color: red; display: none;"></p>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('csv-file');
+        const processButton = document.getElementById('process-button');
+        const downloadButton = document.getElementById('download-button');
+        const processingMessage = document.getElementById('processing-message');
+        const errorMessage = document.getElementById('error-message');
+
+        fileInput.addEventListener('change', function () {
+            processButton.disabled = !fileInput.files.length;
+        });
+
+        processButton.addEventListener('click', function () {
+            const file = fileInput.files[0];
+            if (!file) {
+                errorMessage.textContent = 'Please upload a CSV file.';
+                errorMessage.style.display = 'block';
+                return;
+            }
+
+            errorMessage.style.display = 'none';
+            processingMessage.style.display = 'block';
+            processButton.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/process', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                processingMessage.style.display = 'none';
+                if (response.ok) {
+                    return response.blob();
+                } else {
+                    return response.text().then(errorText => { // Read error as text
+                         try {
+                            const errorJson = JSON.parse(errorText);
+                            throw new Error(errorJson.error || 'Error processing file');
+                         } catch(e) {
+                            throw new Error(errorText || 'Error processing file'); //if it is not a json
+                         }
+                    });
+                }
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                downloadButton.href = url;
+                downloadButton.download = 'processed_data.xlsx';
+                downloadButton.style.display = 'inline-block';
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                errorMessage.textContent = error.message;
+                errorMessage.style.display = 'block';
+                processButton.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>
