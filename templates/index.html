@@ -10,33 +10,120 @@
         .container {
             margin-bottom: 20px;
         }
-        #download-button {
-            display: none;
-            padding: 10px 20px;
-            background-color: #4CAF50;
+        #upload-area {
+            background-color: #f0f0f0;
+            padding: 60px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 60%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #file-upload-section{
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        #csv-file {
+            margin-right: 10px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+            width: 100%;
+        }
+
+        #process-button, #download-button {
+            background-color: #D3D3D3;
             color: white;
+            padding: 10px 20px;
             border: none;
             cursor: pointer;
             text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
         }
-        #download-button:hover {
-            background-color: #45a049;
+        #process-button:hover {
+            background-color: #45a050;
+        }
+        #download-button {
+            display: inline-block;
+            background-color: #D3D3D3;
+            color: white;
+        }
+        #download-button.ready {
+            background-color: #4CAF49; /* green */
+        }
+        #download-button:disabled {
+            background-color: #D3D3D3; /* grey */
+        }
+		#download-button:hover {
+            background-color: #45a050;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background-color: #f3f3f3;
+            border-radius: 5px;
+            overflow: hidden;
+            display: block;
+            margin-top: 20px;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background-color: #4CAF50;
+            transition: width 0.4s ease;
+        }
+        #processing-message {
+            display: none;
+            margin-top: 10px;
+            font-size: 16px;
+            color: #333;
+        }
+        #error-message {
+            color: red;
+            display: none;
+            margin-top: 10px;
+            font-size: 16px;
+        }
+        h1{
+            text-align: center;
+        }
+        #ready-message{
+            display: none;
+            margin-top: 10px;
+            font-size: 16px;
+            color: #333;
         }
     </style>
 </head>
 <body>
-    <h1>Additonal Area Extracter App</h1>
+    <h1>Additional Area Extractor App</h1>
 
-    <div class="container">
-        <label for="csv-file">Upload CSV File:</label>
-        <input type="file" id="csv-file" name="file" accept=".csv">
-    </div>
+    <div id="upload-area">
+        <div id="file-upload-section" style="display: flex; align-items: center; justify-content: center;">
+            <label for="csv-file" style="margin-right: 10px;">Choose File</label>
+            <input type="file" id="csv-file" name="file" accept=".csv" style="margin-right: 10px;">
+            <button id="process-button" disabled style="margin-right: 10px;">Process File</button>
+            <a id="download-button"  href="#" class="">Download Excel</a>
+        </div>
 
-    <div class="container">
-        <button id="process-button" disabled>Process</button>
-        <p id="processing-message" style="display: none;">Processing...</p>
-        <a id="download-button" href="#">Download Excel</a>
-        <p id="error-message" style="color: red; display: none;"></p>
+        <div class="progress-bar" id="progress-bar">
+            <div class="progress-bar-fill" id="progress-bar-fill"></div>
+        </div>
+        <p id="processing-message">Processing...</p>
+        <p id="error-message"></p>
+        <p id="ready-message">File is Ready to Download</p>
     </div>
 
     <script>
@@ -45,10 +132,40 @@
         const downloadButton = document.getElementById('download-button');
         const processingMessage = document.getElementById('processing-message');
         const errorMessage = document.getElementById('error-message');
+        const progressBar = document.getElementById('progress-bar');
+        const progressBarFill = document.getElementById('progress-bar-fill');
+        const readyMessage = document.getElementById('ready-message');
 
         fileInput.addEventListener('change', function () {
             processButton.disabled = !fileInput.files.length;
+            if (fileInput.files.length) {
+                // Change the color of the "Process File" button when a file is uploaded
+                processButton.style.backgroundColor = '#4CAF49';
+            } else {
+                // Reset the color when no file is selected
+                processButton.style.backgroundColor = '#D3D3D3';
+            }
         });
+
+        function simulateProgressBar() {
+            progressBar.style.display = 'block';
+            progressBarFill.style.width = '0%';
+            let progress = 0;
+            const interval = setInterval(() => {
+                if (progress >= 95) {
+                    clearInterval(interval);
+                } else {
+                    progress += 5;
+                    progressBarFill.style.width = progress + '%';
+                }
+            }, 100);
+            return interval;
+        }
+
+        function completeProgressBar(interval) {
+            clearInterval(interval);
+            progressBarFill.style.width = '100%';
+        }
 
         processButton.addEventListener('click', function () {
             const file = fileInput.files[0];
@@ -62,6 +179,8 @@
             processingMessage.style.display = 'block';
             processButton.disabled = true;
 
+            const interval = simulateProgressBar();
+
             const formData = new FormData();
             formData.append('file', file);
 
@@ -71,16 +190,17 @@
             })
             .then(response => {
                 processingMessage.style.display = 'none';
+                completeProgressBar(interval);
                 if (response.ok) {
                     return response.blob();
                 } else {
-                    return response.text().then(errorText => { // Read error as text
-                         try {
+                    return response.text().then(errorText => {
+                        try {
                             const errorJson = JSON.parse(errorText);
                             throw new Error(errorJson.error || 'Error processing file');
-                         } catch(e) {
-                            throw new Error(errorText || 'Error processing file'); //if it is not a json
-                         }
+                        } catch (e) {
+                            throw new Error(errorText || 'Error processing file');
+                        }
                     });
                 }
             })
@@ -88,9 +208,12 @@
                 const url = window.URL.createObjectURL(blob);
                 downloadButton.href = url;
                 downloadButton.download = 'processed_data.xlsx';
+                downloadButton.classList.add('ready');
                 downloadButton.style.display = 'inline-block';
+                readyMessage.style.display = 'block';
             })
             .catch(error => {
+                completeProgressBar(interval);
                 console.error('Fetch error:', error);
                 errorMessage.textContent = error.message;
                 errorMessage.style.display = 'block';
